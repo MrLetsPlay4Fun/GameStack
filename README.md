@@ -164,4 +164,4 @@ Neue Spiele lassen sich einfach durch eine JSON-Datei in `backend/src/gameDefini
 
 ## Lizenz
 
-MIT – siehe [LICENSE](LICENSE)
+GNU Affero General Public License v3.0 – siehe [LICENSE](LICENSE)
