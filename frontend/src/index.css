@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* GameStack – Globale Basis-Stile */
+body {
+  margin: 0;
+  background-color: #1e1f24;
+  color: #dcddde;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}

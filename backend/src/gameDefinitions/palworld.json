@@ -1,0 +1,33 @@
+{
+  "id": "palworld",
+  "name": "Palworld",
+  "emoji": "🐾",
+  "description": "Palworld Dedicated Server via SteamCMD",
+  "type": "steamcmd",
+  "steamAppId": "2394010",
+  "defaultPort": 8211,
+  "features": {
+    "whitelist": {
+      "supported": false,
+      "note": "Palworld unterstützt derzeit keine Whitelist"
+    },
+    "banlist": {
+      "supported": true,
+      "file": "Pal/Saved/SaveGames/banlist.txt",
+      "format": "plaintext",
+      "note": "Eine Steam-ID pro Zeile"
+    },
+    "console": false,
+    "rcon": true
+  },
+  "defaultConfig": {
+    "serverName": "GameStack Palworld",
+    "serverPassword": "",
+    "maxPlayers": 32
+  },
+  "configFields": [
+    { "key": "serverName", "label": "Servername", "type": "text", "default": "GameStack Palworld" },
+    { "key": "serverPassword", "label": "Passwort (leer = kein Passwort)", "type": "text", "default": "" },
+    { "key": "maxPlayers", "label": "Max. Spieler", "type": "number", "default": 32 }
+  ]
+}

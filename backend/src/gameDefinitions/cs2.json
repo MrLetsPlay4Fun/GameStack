@@ -1,0 +1,33 @@
+{
+  "id": "cs2",
+  "name": "Counter-Strike 2",
+  "emoji": "🔫",
+  "description": "CS2 Dedicated Server via SteamCMD",
+  "type": "steamcmd",
+  "steamAppId": "730",
+  "defaultPort": 27015,
+  "features": {
+    "whitelist": {
+      "supported": false,
+      "note": "CS2 hat keine native Whitelist-Funktion"
+    },
+    "banlist": {
+      "supported": true,
+      "file": "cfg/banned_user.cfg",
+      "format": "cfg",
+      "note": "Gesperrte Steam-IDs im Valve-Format"
+    },
+    "console": true,
+    "rcon": true
+  },
+  "defaultConfig": {
+    "mapName": "de_dust2",
+    "maxPlayers": 16,
+    "tickrate": 128
+  },
+  "configFields": [
+    { "key": "mapName", "label": "Start-Map", "type": "text", "default": "de_dust2" },
+    { "key": "maxPlayers", "label": "Max. Spieler", "type": "number", "default": 16 },
+    { "key": "tickrate", "label": "Tickrate", "type": "select", "options": ["64", "128"], "default": "128" }
+  ]
+}

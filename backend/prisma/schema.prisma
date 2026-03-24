@@ -1,0 +1,85 @@
+// GameStack – Datenbankschema
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Benutzer ────────────────────────────────────────────────────────────────
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("admin") // vorerst nur "admin"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  servers Server[]
+}
+
+// ─── Game-Server ──────────────────────────────────────────────────────────────
+
+model Server {
+  id        Int      @id @default(autoincrement())
+  name      String
+  gameType  String   // z.B. "minecraft", "valheim", "cs2"
+  status    String   @default("stopped") // "stopped" | "starting" | "running" | "stopping"
+  port      Int
+  pid       Int?     // Prozess-ID wenn der Server läuft
+  dataPath  String   // Pfad zum Server-Datenordner
+  config    String   @default("{}") // JSON-String mit spielspezifischen Einstellungen
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId  Int
+  user    User             @relation(fields: [userId], references: [id])
+  backups Backup[]
+  tasks   ScheduledTask[]
+}
+
+// ─── Backups ──────────────────────────────────────────────────────────────────
+
+model Backup {
+  id        Int      @id @default(autoincrement())
+  filename  String   // z.B. "backup_2024-01-15_14-30-00.tar.gz"
+  size      Int      @default(0) // Dateigröße in Bytes
+  automatic Boolean  @default(false) // manuell oder automatisch erstellt
+  createdAt DateTime @default(now())
+
+  serverId Int
+  server   Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+}
+
+// ─── Geplante Aufgaben ────────────────────────────────────────────────────────
+
+model ScheduledTask {
+  id        Int       @id @default(autoincrement())
+  serverId  Int
+  name      String
+  cronExpr  String    // z.B. "0 */1 * * *" = jede Stunde
+  commands  String    // JSON-Array mit Befehlen ["say Backup in 1 Minute", "save-all"]
+  enabled   Boolean   @default(true)
+  lastRun   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+}
+
+// ─── Backup-Zeitpläne ─────────────────────────────────────────────────────────
+
+model BackupSchedule {
+  id        Int      @id @default(autoincrement())
+  serverId  Int      @unique // ein Zeitplan pro Server
+  enabled   Boolean  @default(true)
+  cronExpr  String   // z.B. "0 3 * * *" = täglich um 03:00 Uhr
+  keepCount Int      @default(5) // wie viele Backups aufbewahren
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Environment variables – niemals in Git einchecken!
+.env
+.env.local
+**/.env
+**/.env.local
+
+# Daten-Verzeichnis (Game-Server-Dateien, Backups)
+data/
+
+# Build output
+dist/
+build/
+
+# Prisma – Datenbank und generierter Code
+**/*.db
+**/*.db-journal
+backend/src/generated/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

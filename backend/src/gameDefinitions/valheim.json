@@ -1,0 +1,35 @@
+{
+  "id": "valheim",
+  "name": "Valheim",
+  "emoji": "⚔️",
+  "description": "Valheim Dedicated Server via SteamCMD",
+  "type": "steamcmd",
+  "steamAppId": "896660",
+  "defaultPort": 2456,
+  "features": {
+    "whitelist": {
+      "supported": true,
+      "file": "permittedlist.txt",
+      "format": "plaintext",
+      "note": "Eine Steam-ID pro Zeile"
+    },
+    "banlist": {
+      "supported": true,
+      "file": "bannedlist.txt",
+      "format": "plaintext",
+      "note": "Eine Steam-ID pro Zeile"
+    },
+    "console": false,
+    "rcon": false
+  },
+  "defaultConfig": {
+    "worldName": "MyWorld",
+    "serverPassword": "",
+    "maxPlayers": 10
+  },
+  "configFields": [
+    { "key": "worldName", "label": "Weltname", "type": "text", "default": "MyWorld" },
+    { "key": "serverPassword", "label": "Passwort (leer = kein Passwort)", "type": "text", "default": "" },
+    { "key": "maxPlayers", "label": "Max. Spieler", "type": "number", "default": 10 }
+  ]
+}
