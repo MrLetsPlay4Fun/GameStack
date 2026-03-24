@@ -4,8 +4,6 @@ Ein moderner, webbasierter Game-Server-Manager für Linux.
 
 Verwalte deine Game-Server (CS2, Valheim, Minecraft, Palworld und mehr) über ein übersichtliches Webinterface – mit Live-Logs, automatischen Backups und geplanten Aufgaben.
 
-![Dark Mode UI](docs/screenshot.png)
-
 ## Features
 
 - **Server-Verwaltung** – Erstellen, starten, stoppen, neu starten

@@ -9,6 +9,12 @@ const { getGameById } = require('./gameDefinitionService');
 const runningProcesses = new Map(); // serverId → ChildProcess
 const statsIntervals = new Map();   // serverId → setInterval-ID
 
+// Auto-Restart-Tracking
+const manualStops = new Set();      // Server die manuell gestoppt wurden
+const restartAttempts = new Map();  // serverId → { count, windowStart }
+const MAX_RESTARTS = 3;
+const RESTART_WINDOW_MS = 5 * 60 * 1000; // 5 Minuten
+
 // Startbefehl je nach Spieltyp zusammenbauen
 function buildStartCommand(server, game) {
   const dataPath = server.dataPath;
@@ -86,17 +92,56 @@ async function startServer(serverId, io) {
   proc.on('close', async (code) => {
     stopStatsPolling(serverId);
     runningProcesses.delete(serverId);
-    await prisma.server.update({
-      where: { id: serverId },
-      data: { status: 'stopped', pid: null },
-    });
+
+    const wasManual = manualStops.has(serverId);
+    manualStops.delete(serverId);
+
+    // Auto-Restart prüfen: nur bei unerwartetem Absturz (code !== 0)
+    if (!wasManual && code !== 0) {
+      const serverData = await prisma.server.findUnique({ where: { id: serverId } });
+      if (serverData?.autoRestart) {
+        const now = Date.now();
+        const attempts = restartAttempts.get(serverId) || { count: 0, windowStart: now };
+
+        if (now - attempts.windowStart > RESTART_WINDOW_MS) {
+          attempts.count = 0;
+          attempts.windowStart = now;
+        }
+
+        if (attempts.count < MAX_RESTARTS) {
+          attempts.count++;
+          restartAttempts.set(serverId, attempts);
+
+          emitLog(io, serverId, `\n[GameStack] ⚠ Server abgestürzt (Exit-Code: ${code}) – Neustart in 10 Sekunden... (Versuch ${attempts.count}/${MAX_RESTARTS})\n`);
+          await prisma.server.update({ where: { id: serverId }, data: { status: 'stopped', pid: null } });
+          emitStatus(io, serverId, 'stopped');
+
+          setTimeout(async () => {
+            try {
+              emitLog(io, serverId, '[GameStack] Auto-Restart wird ausgeführt...\n');
+              await startServer(serverId, io);
+            } catch (err) {
+              emitLog(io, serverId, `[GameStack] Auto-Restart fehlgeschlagen: ${err.message}\n`);
+            }
+          }, 10000);
+          return;
+        } else {
+          restartAttempts.delete(serverId);
+          emitLog(io, serverId, `\n[GameStack] ✗ Maximale Restart-Versuche (${MAX_RESTARTS}) innerhalb von 5 Minuten erreicht. Bitte manuell prüfen.\n`);
+        }
+      }
+    }
+
+    await prisma.server.update({ where: { id: serverId }, data: { status: 'stopped', pid: null } });
     emitStatus(io, serverId, 'stopped');
-    emitLog(io, serverId, `\n[GameStack] Server gestoppt (Exit-Code: ${code})\n`);
+    const msg = code === 0 ? 'Server gestoppt.' : `Server gestoppt (Exit-Code: ${code})`;
+    emitLog(io, serverId, `\n[GameStack] ${msg}\n`);
   });
 
   proc.on('error', async (err) => {
     stopStatsPolling(serverId);
     runningProcesses.delete(serverId);
+    manualStops.delete(serverId);
     await prisma.server.update({
       where: { id: serverId },
       data: { status: 'stopped', pid: null },
@@ -113,6 +158,9 @@ async function stopServer(serverId, io) {
   const server = await prisma.server.findUnique({ where: { id: serverId } });
   if (!server) throw new Error('Server nicht gefunden.');
   if (server.status === 'stopped') throw new Error('Server ist bereits gestoppt.');
+
+  manualStops.add(serverId); // Als manuellen Stop markieren → kein Auto-Restart
+  restartAttempts.delete(serverId); // Restart-Zähler zurücksetzen
 
   await prisma.server.update({ where: { id: serverId }, data: { status: 'stopping' } });
   emitStatus(io, serverId, 'stopping');
@@ -188,4 +236,4 @@ function emitLog(io, serverId, line) {
   if (io) io.to(`server:${serverId}`).emit('server:log', { serverId, line });
 }
 
-module.exports = { startServer, stopServer, restartServer, sendCommand, runningProcesses };
+module.exports = { startServer, stopServer, restartServer, sendCommand, runningProcesses, manualStops };

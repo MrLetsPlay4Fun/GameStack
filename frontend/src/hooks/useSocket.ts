@@ -25,39 +25,37 @@ export function useServerSocket(
   onLog: (line: string) => void,
   onStatus: (status: string) => void,
   onStats?: (stats: ServerStats) => void,
+  onInstallStatus?: (status: string) => void,
 ) {
   const onLogRef = useRef(onLog);
   const onStatusRef = useRef(onStatus);
   const onStatsRef = useRef(onStats);
+  const onInstallStatusRef = useRef(onInstallStatus);
   onLogRef.current = onLog;
   onStatusRef.current = onStatus;
   onStatsRef.current = onStats;
+  onInstallStatusRef.current = onInstallStatus;
 
   useEffect(() => {
     const s = getSocket();
-
-    // Server-Raum betreten
     s.emit('join:server', serverId);
 
-    const handleLog = (data: { line: string }) => {
-      onLogRef.current(data.line);
-    };
-    const handleStatus = (data: { status: string }) => {
-      onStatusRef.current(data.status);
-    };
-    const handleStats = (data: ServerStats) => {
-      onStatsRef.current?.(data);
-    };
+    const handleLog = (data: { line: string }) => onLogRef.current(data.line);
+    const handleStatus = (data: { status: string }) => onStatusRef.current(data.status);
+    const handleStats = (data: ServerStats) => onStatsRef.current?.(data);
+    const handleInstall = (data: { status: string }) => onInstallStatusRef.current?.(data.status);
 
     s.on('server:log', handleLog);
     s.on('server:status', handleStatus);
     s.on('server:stats', handleStats);
+    s.on('server:install-status', handleInstall);
 
     return () => {
       s.emit('leave:server', serverId);
       s.off('server:log', handleLog);
       s.off('server:status', handleStatus);
       s.off('server:stats', handleStats);
+      s.off('server:install-status', handleInstall);
     };
   }, [serverId]);
 }

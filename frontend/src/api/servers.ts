@@ -22,6 +22,8 @@ export interface Server {
   name: string;
   gameType: string;
   status: string;
+  installStatus: string; // not_installed | installing | installed | failed
+  autoRestart: boolean;
   port: number;
   pid: number | null;
   dataPath: string;
@@ -40,7 +42,9 @@ export const serversApi = {
   getById: (id: number) => API.get<Server>(`/servers/${id}`),
   create: (data: { name: string; gameType: string; port: number; config?: Record<string, any> }) =>
     API.post<Server>('/servers', data),
-  update: (id: number, data: { name?: string; port?: number; config?: Record<string, any> }) =>
+  update: (id: number, data: { name?: string; port?: number; config?: Record<string, any>; autoRestart?: boolean }) =>
     API.patch<Server>(`/servers/${id}`, data),
   delete: (id: number) => API.delete(`/servers/${id}`),
+  install: (id: number) => API.post(`/servers/${id}/install`),
+  update_files: (id: number) => API.post(`/servers/${id}/update`),
 };

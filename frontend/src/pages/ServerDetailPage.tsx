@@ -147,7 +147,7 @@ function ConsoleTab({ serverId, status, onStatusChange }: {
     setLogs((l) => [...l.slice(-500), line]); // max 500 Zeilen im Speicher
   }, []);
 
-  // WebSocket-Verbindung (Stats-Callback wird hier ignoriert, läuft separat)
+  // WebSocket-Verbindung
   useServerSocket(serverId, addLog, onStatusChange);
 
   // Auto-Scroll
@@ -227,6 +227,7 @@ function SettingsTab({ server, game, onSaved }: {
   const [name, setName] = useState(server.name);
   const [port, setPort] = useState(String(server.port));
   const [config, setConfig] = useState<Record<string, any>>(JSON.parse(server.config || '{}'));
+  const [autoRestart, setAutoRestart] = useState(server.autoRestart);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -236,7 +237,7 @@ function SettingsTab({ server, game, onSaved }: {
   const save = async () => {
     setError(''); setLoading(true); setSaved(false);
     try {
-      await serversApi.update(server.id, { name, port: Number(port), config });
+      await serversApi.update(server.id, { name, port: Number(port), config, autoRestart });
       setSaved(true);
       onSaved();
       setTimeout(() => setSaved(false), 3000);
@@ -279,6 +280,22 @@ function SettingsTab({ server, game, onSaved }: {
           <input type="number" value={port} onChange={(e) => setPort(e.target.value)}
             className="w-full bg-[#1e1f24] text-white rounded-lg px-3 py-2.5 text-sm border border-[#3f4147] focus:outline-none focus:border-indigo-500 transition-colors" />
           <p className="text-[#80848e] text-xs mt-1">Port-Änderungen werden beim nächsten Start übernommen.</p>
+        </div>
+
+        {/* Auto-Restart-Toggle */}
+        <div className="flex items-center justify-between py-1">
+          <div>
+            <p className="text-white text-sm font-medium">Auto-Restart bei Absturz</p>
+            <p className="text-[#80848e] text-xs mt-0.5">
+              Server wird automatisch neu gestartet (max. 3× in 5 Min.)
+            </p>
+          </div>
+          <button
+            onClick={() => setAutoRestart(!autoRestart)}
+            className={`relative w-11 h-6 rounded-full transition-colors ${autoRestart ? 'bg-indigo-600' : 'bg-[#3f4147]'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${autoRestart ? 'translate-x-5' : 'translate-x-0'}`} />
+          </button>
         </div>
 
         {/* Whitelist-Toggle (nur wenn unterstützt) */}
@@ -949,12 +966,62 @@ function BackupTab({ serverId, serverStatus }: { serverId: number; serverStatus:
 }
 
 // ─── Übersichts-Tab ────────────────────────────────────────────────────────
-function OverviewTab({ server, game, stats }: {
+function OverviewTab({ server, game, stats, installStatus, onInstall, onUpdate, onTabSwitch }: {
   server: Server; game: GameDefinition | null; stats: ServerStats | null;
+  installStatus: string;
+  onInstall: () => void;
+  onUpdate: () => void;
+  onTabSwitch: (tab: string) => void;
 }) {
   const config = JSON.parse(server.config || '{}');
+  const isInstalling = installStatus === 'installing';
+
   return (
     <div className="space-y-4">
+
+      {/* ── Installations-Banner ── */}
+      {installStatus !== 'installed' && (
+        <div className={`rounded-xl p-5 border ${
+          installStatus === 'failed'     ? 'bg-red-500/10 border-red-500/30' :
+          isInstalling                   ? 'bg-indigo-500/10 border-indigo-500/30' :
+                                           'bg-[#2b2d31] border-[#3f4147]'
+        }`}>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              {installStatus === 'failed' && <>
+                <p className="text-red-400 font-semibold text-sm">✗ Installation fehlgeschlagen</p>
+                <p className="text-[#80848e] text-xs mt-0.5">Prüfe die Konsole für Details und versuche es erneut.</p>
+              </>}
+              {isInstalling && <>
+                <p className="text-indigo-400 font-semibold text-sm flex items-center gap-2">
+                  <span className="animate-spin inline-block">⟳</span> Installation läuft…
+                </p>
+                <p className="text-[#80848e] text-xs mt-0.5">Fortschritt in der Konsole sichtbar.</p>
+              </>}
+              {installStatus === 'not_installed' && <>
+                <p className="text-white font-semibold text-sm">📦 Server noch nicht installiert</p>
+                <p className="text-[#80848e] text-xs mt-0.5">
+                  {game?.type === 'java' ? 'Paper JAR wird von papermc.io heruntergeladen.' : 'Server-Dateien werden via SteamCMD installiert.'}
+                </p>
+              </>}
+            </div>
+            <div className="flex gap-2">
+              {isInstalling ? (
+                <button onClick={() => onTabSwitch('console')}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+                  Konsole öffnen
+                </button>
+              ) : (
+                <button onClick={onInstall}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+                  {installStatus === 'failed' ? '↺ Erneut versuchen' : '▼ Jetzt installieren'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Ressourcen-Karten (nur wenn Server läuft) */}
       {server.status === 'running' && (
         <div className="grid grid-cols-2 gap-4">
@@ -1035,6 +1102,7 @@ export default function ServerDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [stats, setStats] = useState<ServerStats | null>(null);
+  const [installStatus, setInstallStatus] = useState<string>('');
 
   const { refresh: refreshSidebar } = useServers();
 
@@ -1056,7 +1124,17 @@ export default function ServerDetailPage() {
     setStats(s);
   }, []);
 
+  const handleInstallStatus = useCallback((status: string) => {
+    setInstallStatus(status);
+    if (status === 'installed' || status === 'failed') loadServer();
+  }, []);
+
   useServerStats(Number(id), handleStats);
+
+  // installStatus aus DB laden wenn Seite geöffnet wird
+  useEffect(() => {
+    if (server) setInstallStatus(server.installStatus);
+  }, [server?.installStatus]);
 
   useEffect(() => { loadServer(); }, [id]);
 
@@ -1068,6 +1146,28 @@ export default function ServerDetailPage() {
     } catch (e: any) {
       setError(e.response?.data?.error || `Aktion fehlgeschlagen.`);
     } finally { setActionLoading(false); }
+  };
+
+  const handleInstall = async () => {
+    setError('');
+    try {
+      await serversApi.install(server!.id);
+      setInstallStatus('installing');
+      setActiveTab('console'); // Direkt zur Konsole wechseln
+    } catch (e: any) {
+      setError(e.response?.data?.error || 'Installation fehlgeschlagen.');
+    }
+  };
+
+  const handleUpdate = async () => {
+    setError('');
+    try {
+      await serversApi.update_files(server!.id);
+      setInstallStatus('installing');
+      setActiveTab('console');
+    } catch (e: any) {
+      setError(e.response?.data?.error || 'Update fehlgeschlagen.');
+    }
   };
 
   if (!server) return (
@@ -1123,7 +1223,7 @@ export default function ServerDetailPage() {
           <div className="flex gap-2 flex-wrap">
             {error && <p className="text-red-400 text-xs self-center">{error}</p>}
             <ActionBtn label="▶ Starten" onClick={() => action('start')}
-              disabled={actionLoading || server.status === 'running' || server.status === 'starting'}
+              disabled={actionLoading || installStatus !== 'installed' || server.status === 'running' || server.status === 'starting'}
               color="bg-green-600 hover:bg-green-500 text-white" />
             <ActionBtn label="⏹ Stoppen" onClick={() => action('stop')}
               disabled={actionLoading || server.status === 'stopped' || server.status === 'stopping'}
@@ -1131,6 +1231,11 @@ export default function ServerDetailPage() {
             <ActionBtn label="↺ Neu starten" onClick={() => action('restart')}
               disabled={actionLoading || server.status !== 'running'}
               color="bg-[#3f4147] hover:bg-[#4e5058] text-white" />
+            {installStatus === 'installed' && server.status === 'stopped' && (
+              <ActionBtn label="⬆ Aktualisieren" onClick={handleUpdate}
+                disabled={actionLoading}
+                color="bg-[#3f4147] hover:bg-[#4e5058] text-white" />
+            )}
           </div>
         </div>
       </div>
@@ -1148,7 +1253,9 @@ export default function ServerDetailPage() {
       </div>
 
       {/* Tab-Inhalt */}
-      {activeTab === 'overview'  && <OverviewTab server={server} game={game} stats={stats} />}
+      {activeTab === 'overview'  && <OverviewTab server={server} game={game} stats={stats}
+        installStatus={installStatus} onInstall={handleInstall} onUpdate={handleUpdate}
+        onTabSwitch={(tab) => setActiveTab(tab as Tab)} />}
       {activeTab === 'console'   && <ConsoleTab serverId={server.id} status={server.status} onStatusChange={handleStatusChange} />}
       {activeTab === 'settings'  && <SettingsTab server={server} game={game} onSaved={loadServer} />}
       {activeTab === 'backups'   && <BackupTab serverId={server.id} serverStatus={server.status} />}

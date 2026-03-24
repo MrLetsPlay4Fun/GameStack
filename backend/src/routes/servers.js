@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const prisma = require('../lib/prisma');
 const { getGameById } = require('../services/gameDefinitionService');
 const { startServer, stopServer, restartServer, sendCommand } = require('../services/serverProcessService');
+const { installServer, updateServer } = require('../services/installService');
 const path = require('path');
 
 // io-Instanz wird beim Start gesetzt
@@ -86,10 +87,11 @@ router.patch('/:id', requireAuth, async (req, res) => {
     });
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
-    const { name, port, config } = req.body;
+    const { name, port, config, autoRestart } = req.body;
     const updateData = {};
 
     if (name) updateData.name = name;
+    if (autoRestart !== undefined) updateData.autoRestart = Boolean(autoRestart);
     if (port) {
       // Port-Konflikt prüfen (außer eigener Port)
       const conflict = await prisma.server.findFirst({
@@ -137,11 +139,48 @@ router.delete('/:id', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/servers/:id/install – Game-Server-Dateien installieren
+router.post('/:id/install', requireAuth, async (req, res) => {
+  try {
+    const server = await prisma.server.findFirst({ where: { id: Number(req.params.id), userId: req.user.id } });
+    if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
+    if (server.installStatus === 'installing') {
+      return res.status(400).json({ error: 'Installation läuft bereits.' });
+    }
+    // Im Hintergrund starten – Client bekommt Updates via Socket.io
+    installServer(server.id, _io).catch(() => {});
+    res.json({ message: 'Installation gestartet.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/servers/:id/update – Game-Server-Dateien aktualisieren
+router.post('/:id/update', requireAuth, async (req, res) => {
+  try {
+    const server = await prisma.server.findFirst({ where: { id: Number(req.params.id), userId: req.user.id } });
+    if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
+    if (server.status === 'running') {
+      return res.status(400).json({ error: 'Server muss zuerst gestoppt werden.' });
+    }
+    if (server.installStatus === 'installing') {
+      return res.status(400).json({ error: 'Installation/Update läuft bereits.' });
+    }
+    updateServer(server.id, _io).catch(() => {});
+    res.json({ message: 'Update gestartet.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/servers/:id/start
 router.post('/:id/start', requireAuth, async (req, res) => {
   try {
     const server = await prisma.server.findFirst({ where: { id: Number(req.params.id), userId: req.user.id } });
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
+    if (server.installStatus !== 'installed') {
+      return res.status(400).json({ error: 'Server muss zuerst installiert werden.' });
+    }
     const pid = await startServer(server.id, _io);
     res.json({ message: 'Server wird gestartet.', pid });
   } catch (err) {
