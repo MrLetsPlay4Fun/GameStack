@@ -8,6 +8,11 @@ export interface GameDefinition {
   type: string;
   defaultPort: number;
   defaultConfig: Record<string, any>;
+  features?: {
+    whitelist?: { supported: boolean; file?: string; note?: string };
+    banlist?: { supported: boolean; file?: string; note?: string };
+    console?: boolean;
+  };
   configFields: Array<{
     key: string;
     label: string;

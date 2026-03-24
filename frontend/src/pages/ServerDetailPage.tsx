@@ -966,7 +966,7 @@ function BackupTab({ serverId, serverStatus }: { serverId: number; serverStatus:
 }
 
 // ─── Übersichts-Tab ────────────────────────────────────────────────────────
-function OverviewTab({ server, game, stats, installStatus, onInstall, onUpdate, onTabSwitch }: {
+function OverviewTab({ server, game, stats, installStatus, onInstall, onUpdate: _onUpdate, onTabSwitch }: {
   server: Server; game: GameDefinition | null; stats: ServerStats | null;
   installStatus: string;
   onInstall: () => void;
