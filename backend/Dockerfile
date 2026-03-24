@@ -4,9 +4,15 @@ FROM node:22-slim
 RUN apt-get update && apt-get install -y \
     openssl \
     ca-certificates \
-    && echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/backports.list \
+    wget \
+    && mkdir -p /etc/apt/keyrings \
+    && wget -qO /etc/apt/keyrings/adoptium.asc https://packages.adoptium.net/artifactory/api/gpg/key/public \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb ${VERSION_CODENAME} main" > /etc/apt/sources.list.d/adoptium.list \
     && apt-get update \
-    && apt-get install -y -t bookworm-backports openjdk-21-jre-headless \
+    && apt-get install -y temurin-21-jre \
+    && apt-get remove -y wget \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
