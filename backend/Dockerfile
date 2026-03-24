@@ -4,7 +4,9 @@ FROM node:22-slim
 RUN apt-get update && apt-get install -y \
     openssl \
     ca-certificates \
-    openjdk-21-jre-headless \
+    && echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/backports.list \
+    && apt-get update \
+    && apt-get install -y -t bookworm-backports openjdk-21-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
