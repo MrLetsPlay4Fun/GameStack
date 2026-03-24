@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     && . /etc/os-release \
     && echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb ${VERSION_CODENAME} main" > /etc/apt/sources.list.d/adoptium.list \
     && apt-get update \
-    && apt-get install -y temurin-21-jre \
+    && apt-get install -y temurin-25-jre \
     && apt-get remove -y wget \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
