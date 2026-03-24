@@ -4,7 +4,7 @@ import Layout from '../components/Layout';
 import { serversApi, gamesApi } from '../api/servers';
 import type { Server, GameDefinition } from '../api/servers';
 import API from '../api/auth';
-import { useServerSocket, useServerStats } from '../hooks/useSocket';
+import { useServerSocket, useServerStats, useServerInstallStatus } from '../hooks/useSocket';
 import type { ServerStats } from '../hooks/useSocket';
 import { useServers } from '../context/ServerContext';
 
@@ -1130,6 +1130,7 @@ export default function ServerDetailPage() {
   }, []);
 
   useServerStats(Number(id), handleStats);
+  useServerInstallStatus(Number(id), handleInstallStatus);
 
   // installStatus aus DB laden wenn Seite geöffnet wird
   useEffect(() => {

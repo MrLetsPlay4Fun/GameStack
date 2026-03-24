@@ -60,6 +60,28 @@ export function useServerSocket(
   }, [serverId]);
 }
 
+// Separater Hook: Install-Status empfangen + Room joinen (damit Events auch ohne offene Konsole ankommen)
+export function useServerInstallStatus(
+  serverId: number,
+  onInstallStatus: (status: string) => void,
+) {
+  const ref = useRef(onInstallStatus);
+  ref.current = onInstallStatus;
+
+  useEffect(() => {
+    const s = getSocket();
+    s.emit('join:server', serverId); // Room betreten damit Events ankommen
+    const handle = (data: { serverId: number; status: string }) => {
+      if (data.serverId === serverId) ref.current(data.status);
+    };
+    s.on('server:install-status', handle);
+    return () => {
+      s.off('server:install-status', handle);
+      // Room nicht verlassen – ConsoleTab oder Stats könnten noch aktiv sein
+    };
+  }, [serverId]);
+}
+
 // Separater Hook: nur Stats empfangen (kein Room-Join – ConsoleTab macht das bereits)
 export function useServerStats(
   serverId: number,
