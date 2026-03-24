@@ -1,12 +1,36 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { serversApi, gamesApi } from '../api/servers';
+import { serversApi, gamesApi, mcVersionsApi } from '../api/servers';
 import type { Server, GameDefinition } from '../api/servers';
 import API from '../api/auth';
 import { useServerSocket, useServerStats, useServerInstallStatus } from '../hooks/useSocket';
 import type { ServerStats } from '../hooks/useSocket';
 import { useServers } from '../context/ServerContext';
+
+function MinecraftVersionSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [versions, setVersions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    mcVersionsApi.getVersions()
+      .then((res) => setVersions(res.data.versions))
+      .catch(() => setVersions([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={loading}
+      className="w-full bg-[#1e1f24] text-white rounded-lg px-3 py-2.5 text-sm border border-[#3f4147] focus:outline-none focus:border-indigo-500 transition-colors disabled:opacity-60"
+    >
+      <option value="latest">⭐ Neueste Version (empfohlen)</option>
+      {versions.map((v) => <option key={v} value={v}>{v}</option>)}
+    </select>
+  );
+}
 
 type Tab = 'overview' | 'console' | 'settings' | 'backups' | 'tasks' | 'whitelist' | 'banlist';
 
@@ -221,8 +245,8 @@ function ConsoleTab({ serverId, status, onStatusChange }: {
 }
 
 // ─── Einstellungs-Tab ─────────────────────────────────────────────────────
-function SettingsTab({ server, game, onSaved }: {
-  server: Server; game: GameDefinition | null; onSaved: () => void;
+function SettingsTab({ server, game, onSaved, onUpdate }: {
+  server: Server; game: GameDefinition | null; onSaved: () => void; onUpdate?: () => void;
 }) {
   const [name, setName] = useState(server.name);
   const [port, setPort] = useState(String(server.port));
@@ -231,15 +255,23 @@ function SettingsTab({ server, game, onSaved }: {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const savedVersion = useRef(JSON.parse(server.config || '{}').minecraftVersion as string | undefined);
+  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
 
   const whitelistEnabled = config.whitelistEnabled ?? false;
 
   const save = async () => {
-    setError(''); setLoading(true); setSaved(false);
+    setError(''); setLoading(true); setSaved(false); setShowUpdatePrompt(false);
     try {
       await serversApi.update(server.id, { name, port: Number(port), config, autoRestart });
       setSaved(true);
       onSaved();
+      // Versions-Änderung erkennen → Update-Prompt anzeigen
+      const newVersion = config.minecraftVersion;
+      if (newVersion && newVersion !== savedVersion.current && server.status === 'stopped') {
+        setShowUpdatePrompt(true);
+      }
+      savedVersion.current = newVersion;
       setTimeout(() => setSaved(false), 3000);
     } catch (e: any) {
       setError(e.response?.data?.error || 'Speichern fehlgeschlagen.');
@@ -333,7 +365,12 @@ function SettingsTab({ server, game, onSaved }: {
               <label className="block text-xs font-semibold text-[#b5bac1] uppercase tracking-wide mb-1.5">
                 {field.label}
               </label>
-              {field.type === 'select' ? (
+              {field.type === 'mc-version' ? (
+                <MinecraftVersionSelect
+                  value={config[field.key] ?? field.default}
+                  onChange={(v) => setConfigField(field.key, v)}
+                />
+              ) : field.type === 'select' ? (
                 <select value={config[field.key] ?? field.default}
                   onChange={(e) => setConfigField(field.key, e.target.value)}
                   className="w-full bg-[#1e1f24] text-white rounded-lg px-3 py-2.5 text-sm border border-[#3f4147] focus:outline-none focus:border-indigo-500 transition-colors">
@@ -357,6 +394,24 @@ function SettingsTab({ server, game, onSaved }: {
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors">
         {loading ? 'Speichert…' : saved ? '✓ Gespeichert!' : 'Einstellungen speichern'}
       </button>
+
+      {/* Update-Prompt nach Versions-Änderung */}
+      {showUpdatePrompt && (
+        <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-4">
+          <p className="text-indigo-400 text-sm font-semibold mb-1">
+            🔄 Version wurde geändert
+          </p>
+          <p className="text-[#b5bac1] text-xs mb-3">
+            Klicke auf "Jetzt updaten" um die neue Version herunterzuladen und zu installieren.
+          </p>
+          <button
+            onClick={() => { setShowUpdatePrompt(false); onUpdate?.(); }}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            ⬆ Jetzt updaten
+          </button>
+        </div>
+      )}
 
       {/* Gefahrenzone */}
       <div className="bg-[#2b2d31] rounded-xl p-5 border border-red-500/20">
@@ -1258,7 +1313,7 @@ export default function ServerDetailPage() {
         installStatus={installStatus} onInstall={handleInstall} onUpdate={handleUpdate}
         onTabSwitch={(tab) => setActiveTab(tab as Tab)} />}
       {activeTab === 'console'   && <ConsoleTab serverId={server.id} status={server.status} onStatusChange={handleStatusChange} />}
-      {activeTab === 'settings'  && <SettingsTab server={server} game={game} onSaved={loadServer} />}
+      {activeTab === 'settings'  && <SettingsTab server={server} game={game} onSaved={loadServer} onUpdate={handleUpdate} />}
       {activeTab === 'backups'   && <BackupTab serverId={server.id} serverStatus={server.status} />}
       {activeTab === 'tasks'     && <TasksTab serverId={server.id} />}
       {activeTab === 'whitelist' && (

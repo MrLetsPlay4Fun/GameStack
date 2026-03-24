@@ -25,14 +25,14 @@
     "rcon": false
   },
   "defaultConfig": {
-    "minecraftVersion": "1.21.4",
+    "minecraftVersion": "latest",
     "maxPlayers": 20,
     "gamemode": "survival",
     "difficulty": "normal",
     "memory": "2048"
   },
   "configFields": [
-    { "key": "minecraftVersion", "label": "Minecraft-Version", "type": "text", "default": "1.21.4" },
+    { "key": "minecraftVersion", "label": "Minecraft-Version", "type": "mc-version", "default": "latest" },
     { "key": "maxPlayers", "label": "Max. Spieler", "type": "number", "default": 20 },
     { "key": "gamemode", "label": "Spielmodus", "type": "select", "options": ["survival", "creative", "adventure"], "default": "survival" },
     { "key": "difficulty", "label": "Schwierigkeit", "type": "select", "options": ["peaceful", "easy", "normal", "hard"], "default": "normal" },

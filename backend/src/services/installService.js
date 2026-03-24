@@ -80,7 +80,18 @@ async function downloadFile(url, destPath, io, serverId) {
 // ── Minecraft (Paper) installieren ───────────────────────────────────────────
 
 async function installPaper(server, config, io) {
-  const version = config.minecraftVersion || '1.21.4';
+  let version = config.minecraftVersion || 'latest';
+
+  // "latest" → neueste stabile Version von der Paper API ermitteln
+  if (version === 'latest') {
+    emitLog(io, server.id, '[GameStack] Ermittle neueste Minecraft-Version...\n');
+    const projectRes = await fetch('https://api.papermc.io/v2/projects/paper');
+    if (!projectRes.ok) throw new Error('Paper API nicht erreichbar');
+    const projectData = await projectRes.json();
+    version = projectData.versions[projectData.versions.length - 1];
+    emitLog(io, server.id, `[GameStack] Neueste Version: ${version}\n`);
+  }
+
   emitLog(io, server.id, `[GameStack] Verbinde mit Paper-API für Version ${version}...\n`);
 
   // Neuesten Build von der Paper API holen

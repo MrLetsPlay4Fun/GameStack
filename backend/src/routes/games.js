@@ -14,6 +14,20 @@ router.get('/', requireAuth, (req, res) => {
   }
 });
 
+// GET /api/games/minecraft/versions – verfügbare Paper-Versionen (neueste zuerst)
+router.get('/minecraft/versions', requireAuth, async (req, res) => {
+  try {
+    const apiRes = await fetch('https://api.papermc.io/v2/projects/paper');
+    if (!apiRes.ok) throw new Error('Paper API nicht erreichbar');
+    const data = await apiRes.json();
+    const versions = [...data.versions].reverse(); // neueste zuerst
+    res.json({ versions });
+  } catch (err) {
+    console.error('[Games] Versionen konnten nicht geladen werden:', err);
+    res.status(500).json({ error: 'Versionen konnten nicht geladen werden.' });
+  }
+});
+
 // GET /api/games/:id – ein einzelnes Spiel
 router.get('/:id', requireAuth, (req, res) => {
   try {

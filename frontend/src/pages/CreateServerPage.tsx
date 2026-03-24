@@ -1,9 +1,33 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { gamesApi, serversApi } from '../api/servers';
+import { gamesApi, serversApi, mcVersionsApi } from '../api/servers';
 import type { GameDefinition } from '../api/servers';
 import { useServers } from '../context/ServerContext';
+
+function MinecraftVersionSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [versions, setVersions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    mcVersionsApi.getVersions()
+      .then((res) => setVersions(res.data.versions))
+      .catch(() => setVersions([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={loading}
+      className="w-full bg-[#1e1f24] text-white rounded-lg px-3 py-2.5 text-sm border border-[#3f4147] focus:outline-none focus:border-indigo-500 transition-colors disabled:opacity-60"
+    >
+      <option value="latest">⭐ Neueste Version (empfohlen)</option>
+      {versions.map((v) => <option key={v} value={v}>{v}</option>)}
+    </select>
+  );
+}
 
 export default function CreateServerPage() {
   const navigate = useNavigate();
@@ -144,7 +168,12 @@ export default function CreateServerPage() {
                 <label className="block text-xs font-semibold text-[#b5bac1] uppercase tracking-wide mb-1.5">
                   {field.label}
                 </label>
-                {field.type === 'select' ? (
+                {field.type === 'mc-version' ? (
+                  <MinecraftVersionSelect
+                    value={config[field.key] ?? field.default}
+                    onChange={(v) => setConfig({ ...config, [field.key]: v })}
+                  />
+                ) : field.type === 'select' ? (
                   <select
                     value={config[field.key] ?? field.default}
                     onChange={(e) => setConfig({ ...config, [field.key]: e.target.value })}

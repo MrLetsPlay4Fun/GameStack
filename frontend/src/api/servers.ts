@@ -16,7 +16,7 @@ export interface GameDefinition {
   configFields: Array<{
     key: string;
     label: string;
-    type: 'text' | 'number' | 'select';
+    type: 'text' | 'number' | 'select' | 'mc-version';
     options?: string[];
     default: any;
   }>;
@@ -40,6 +40,10 @@ export interface Server {
 export const gamesApi = {
   getAll: () => API.get<GameDefinition[]>('/games'),
   getById: (id: string) => API.get<GameDefinition>(`/games/${id}`),
+};
+
+export const mcVersionsApi = {
+  getVersions: () => API.get<{ versions: string[] }>('/games/minecraft/versions'),
 };
 
 export const serversApi = {
