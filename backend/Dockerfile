@@ -1,10 +1,12 @@
 FROM node:22-slim
 
 # System-Abhängigkeiten für Prisma + native Module
-RUN apt-get update && apt-get install -y \
+RUN dpkg --add-architecture i386 \
+    && apt-get update && apt-get install -y \
     openssl \
     ca-certificates \
     wget \
+    lib32gcc-s1 \
     && mkdir -p /etc/apt/keyrings \
     && wget -qO /etc/apt/keyrings/adoptium.asc https://packages.adoptium.net/artifactory/api/gpg/key/public \
     && . /etc/os-release \
