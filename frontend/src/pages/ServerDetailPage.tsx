@@ -26,7 +26,8 @@ function MinecraftVersionSelect({ value, onChange }: { value: string; onChange: 
       disabled={loading}
       className="w-full bg-[#1e1f24] text-white rounded-lg px-3 py-2.5 text-sm border border-[#3f4147] focus:outline-none focus:border-indigo-500 transition-colors disabled:opacity-60"
     >
-      <option value="latest">⭐ Neueste Version (empfohlen)</option>
+      <option value="latest">⭐ Neueste Paper-Version (empfohlen)</option>
+      <option value="vanilla-latest">🎮 Vanilla – Direkt von Minecraft.net (immer neueste)</option>
       {versions.map((v) => <option key={v} value={v}>{v}</option>)}
     </select>
   );

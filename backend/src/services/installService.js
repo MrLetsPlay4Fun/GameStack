@@ -77,10 +77,51 @@ async function downloadFile(url, destPath, io, serverId) {
   });
 }
 
+// ── Minecraft (Vanilla) installieren ─────────────────────────────────────────
+
+async function installVanillaLatest(server, io) {
+  emitLog(io, server.id, '[GameStack] Verbinde mit Mojang-API...\n');
+
+  // 1. Versions-Manifest abrufen
+  const manifestRes = await fetch('https://launchermeta.mojang.com/mc/game/version_manifest_v2.json');
+  if (!manifestRes.ok) throw new Error('Mojang-API nicht erreichbar');
+  const manifest = await manifestRes.json();
+
+  // 2. Neueste Release-Version ermitteln
+  const latestVersion = manifest.latest.release;
+  emitLog(io, server.id, `[GameStack] Neueste Minecraft-Version: ${latestVersion}\n`);
+
+  // 3. Versions-spezifische JSON-URL finden
+  const versionEntry = manifest.versions.find((v) => v.id === latestVersion);
+  if (!versionEntry) throw new Error(`Version ${latestVersion} nicht im Manifest gefunden`);
+
+  // 4. Server-Download-URL aus den Versions-Details holen
+  const versionRes = await fetch(versionEntry.url);
+  if (!versionRes.ok) throw new Error('Versions-Details nicht abrufbar');
+  const versionData = await versionRes.json();
+
+  const serverDownloadUrl = versionData.downloads?.server?.url;
+  if (!serverDownloadUrl) throw new Error('Kein Server-Download für diese Version verfügbar');
+
+  // 5. Server-JAR herunterladen
+  const jarPath = path.join(server.dataPath, 'server.jar');
+  emitLog(io, server.id, `[GameStack] Lade Vanilla Minecraft ${latestVersion} herunter...\n`);
+
+  await downloadFile(serverDownloadUrl, jarPath, io, server.id);
+  fs.writeFileSync(path.join(server.dataPath, 'eula.txt'), 'eula=true\n');
+  emitLog(io, server.id, `[GameStack] Vanilla Minecraft ${latestVersion} installiert!\n`);
+  emitLog(io, server.id, '[GameStack] EULA automatisch akzeptiert.\n');
+}
+
 // ── Minecraft (Paper) installieren ───────────────────────────────────────────
 
 async function installPaper(server, config, io) {
   let version = config.minecraftVersion || 'latest';
+
+  // "vanilla-latest" → Vanilla-Server direkt von Mojang herunterladen
+  if (version === 'vanilla-latest') {
+    return await installVanillaLatest(server, io);
+  }
 
   // "latest" → neueste stabile Version von der Paper API ermitteln
   if (version === 'latest') {
