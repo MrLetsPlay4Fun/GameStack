@@ -21,12 +21,30 @@
     "rcon": true
   },
   "defaultConfig": {
+    "gameMode": "competitive",
     "mapName": "de_dust2",
     "maxPlayers": 16,
     "tickrate": 128
   },
   "configFields": [
-    { "key": "mapName", "label": "Start-Map", "type": "text", "default": "de_dust2" },
+    {
+      "key": "gameMode",
+      "label": "Spielmodus",
+      "type": "select",
+      "options": ["competitive", "casual", "deathmatch", "wingman", "arms_race", "demolition"],
+      "default": "competitive"
+    },
+    {
+      "key": "mapName",
+      "label": "Start-Map",
+      "type": "select",
+      "options": [
+        "de_dust2", "de_mirage", "de_inferno", "de_nuke",
+        "de_overpass", "de_ancient", "de_anubis", "de_vertigo",
+        "de_train", "cs_office", "cs_italy"
+      ],
+      "default": "de_dust2"
+    },
     { "key": "maxPlayers", "label": "Max. Spieler", "type": "number", "default": 16 },
     { "key": "tickrate", "label": "Tickrate", "type": "select", "options": ["64", "128"], "default": "128" }
   ]

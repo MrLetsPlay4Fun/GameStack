@@ -30,10 +30,27 @@ function buildStartCommand(server, game) {
   }
 
   if (game.type === 'steamcmd') {
+    // CS2 Spielmodus → game_type + game_mode Parameter
+    const CS2_MODES = {
+      competitive: { type: 0, mode: 1 },
+      casual:      { type: 0, mode: 0 },
+      deathmatch:  { type: 1, mode: 2 },
+      wingman:     { type: 0, mode: 2 },
+      arms_race:   { type: 1, mode: 0 },
+      demolition:  { type: 1, mode: 1 },
+    };
+    const cs2Mode = CS2_MODES[config.gameMode] || CS2_MODES.competitive;
+
     // Startskript je nach Spiel
     const scripts = {
       valheim: { cmd: './valheim_server.x86_64', args: ['-name', config.worldName || 'MyWorld', '-port', String(server.port), '-world', config.worldName || 'MyWorld', '-password', config.serverPassword || ''] },
-      cs2: { cmd: './game/bin/linuxsteamrt64/cs2', args: ['-dedicated', '-port', String(server.port), '+map', config.mapName || 'de_dust2'] },
+      cs2: { cmd: './game/bin/linuxsteamrt64/cs2', args: [
+        '-dedicated',
+        '-port', String(server.port),
+        '+game_type', String(cs2Mode.type),
+        '+game_mode', String(cs2Mode.mode),
+        '+map', config.mapName || 'de_dust2',
+      ]},
       palworld: { cmd: './PalServer.sh', args: [] },
     };
     const script = scripts[game.id] || { cmd: './start.sh', args: [] };

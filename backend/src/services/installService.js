@@ -26,22 +26,31 @@ async function ensureSteamCmd(io, serverId) {
   emitLog(io, serverId, '[GameStack] SteamCMD wird heruntergeladen...\n');
   fs.mkdirSync(STEAMCMD_DIR, { recursive: true });
 
-  return new Promise((resolve, reject) => {
-    const proc = spawn('bash', ['-c',
-      `curl -sSL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar -xzf - -C "${STEAMCMD_DIR}"`,
-    ]);
+  // Tarball via fetch herunterladen (kein curl nötig)
+  const tarPath = path.join(STEAMCMD_DIR, 'steamcmd_linux.tar.gz');
+  await downloadFile(
+    'https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz',
+    tarPath,
+    io,
+    serverId,
+  );
+
+  // Entpacken mit tar
+  await new Promise((resolve, reject) => {
+    const proc = spawn('tar', ['-xzf', tarPath, '-C', STEAMCMD_DIR]);
     proc.stderr.on('data', (d) => emitLog(io, serverId, d.toString()));
     proc.on('close', (code) => {
-      if (code === 0) {
-        fs.chmodSync(steamcmdExe, '755');
-        emitLog(io, serverId, '[GameStack] SteamCMD bereit.\n');
-        resolve(steamcmdExe);
-      } else {
-        reject(new Error('SteamCMD-Download fehlgeschlagen.'));
-      }
+      if (code === 0) resolve();
+      else reject(new Error('SteamCMD-Entpacken fehlgeschlagen.'));
     });
     proc.on('error', reject);
   });
+
+  // Tarball aufräumen und Ausführrechte setzen
+  fs.unlinkSync(tarPath);
+  fs.chmodSync(steamcmdExe, '755');
+  emitLog(io, serverId, '[GameStack] SteamCMD bereit.\n');
+  return steamcmdExe;
 }
 
 // ── Datei via fetch herunterladen (kein curl nötig) ───────────────────────────
