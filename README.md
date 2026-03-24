@@ -19,7 +19,7 @@ Verwalte deine Game-Server (CS2, Valheim, Minecraft, Palworld und mehr) über ei
 ## Schnellinstallation (Ubuntu / Debian)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/ahippler/GameStack/main/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/MrLetsPlay4Fun/GameStack/main/install.sh | sudo bash
 ```
 
 Das Script:
@@ -37,7 +37,7 @@ Beim ersten Aufruf wird ein Admin-Account angelegt.
 
 ```bash
 # 1. Repository klonen
-git clone https://github.com/ahippler/GameStack /opt/gamestack
+git clone https://github.com/MrLetsPlay4Fun/GameStack /opt/gamestack
 cd /opt/gamestack
 
 # 2. Konfiguration anlegen

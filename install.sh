@@ -4,7 +4,7 @@ set -e
 # ── GameStack Installer ───────────────────────────────────────────────────────
 # Unterstützte Systeme: Ubuntu 20.04+, Debian 11+
 
-REPO_URL="https://github.com/ahippler/GameStack"
+REPO_URL="https://github.com/MrLetsPlay4Fun/GameStack"
 INSTALL_DIR="/opt/gamestack"
 BOLD="\033[1m"
 GREEN="\033[0;32m"
