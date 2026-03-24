@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const { Readable } = require('stream');
 const path = require('path');
 const fs = require('fs');
 const prisma = require('../lib/prisma');
@@ -43,6 +44,39 @@ async function ensureSteamCmd(io, serverId) {
   });
 }
 
+// ── Datei via fetch herunterladen (kein curl nötig) ───────────────────────────
+
+async function downloadFile(url, destPath, io, serverId) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} beim Download`);
+
+  const totalBytes = parseInt(res.headers.get('content-length') || '0', 10);
+  let downloadedBytes = 0;
+  let lastPercent = 0;
+
+  const fileStream = fs.createWriteStream(destPath);
+  const readable = Readable.fromWeb(res.body);
+
+  return new Promise((resolve, reject) => {
+    readable.on('data', (chunk) => {
+      downloadedBytes += chunk.length;
+      if (totalBytes > 0) {
+        const percent = Math.floor((downloadedBytes / totalBytes) * 100);
+        if (percent >= lastPercent + 10) {
+          lastPercent = percent;
+          const mb = (downloadedBytes / 1024 / 1024).toFixed(1);
+          const total = (totalBytes / 1024 / 1024).toFixed(1);
+          emitLog(io, serverId, `[GameStack] Fortschritt: ${percent}% (${mb} / ${total} MB)\n`);
+        }
+      }
+    });
+    readable.on('error', reject);
+    fileStream.on('finish', resolve);
+    fileStream.on('error', reject);
+    readable.pipe(fileStream);
+  });
+}
+
 // ── Minecraft (Paper) installieren ───────────────────────────────────────────
 
 async function installPaper(server, config, io) {
@@ -64,21 +98,10 @@ async function installPaper(server, config, io) {
 
   emitLog(io, server.id, `[GameStack] Lade Paper ${version} (Build ${latestBuild}) herunter...\n`);
 
-  return new Promise((resolve, reject) => {
-    const proc = spawn('curl', ['-L', '--progress-bar', downloadUrl, '-o', jarPath]);
-    proc.stderr.on('data', (d) => emitLog(io, server.id, d.toString()));
-    proc.on('close', (code) => {
-      if (code === 0) {
-        fs.writeFileSync(path.join(server.dataPath, 'eula.txt'), 'eula=true\n');
-        emitLog(io, server.id, `[GameStack] Paper ${version} (Build ${latestBuild}) installiert!\n`);
-        emitLog(io, server.id, '[GameStack] EULA automatisch akzeptiert.\n');
-        resolve();
-      } else {
-        reject(new Error('Paper-Download fehlgeschlagen.'));
-      }
-    });
-    proc.on('error', reject);
-  });
+  await downloadFile(downloadUrl, jarPath, io, server.id);
+  fs.writeFileSync(path.join(server.dataPath, 'eula.txt'), 'eula=true\n');
+  emitLog(io, server.id, `[GameStack] Paper ${version} (Build ${latestBuild}) installiert!\n`);
+  emitLog(io, server.id, '[GameStack] EULA automatisch akzeptiert.\n');
 }
 
 // ── SteamCMD-Spiel installieren / aktualisieren ───────────────────────────────
