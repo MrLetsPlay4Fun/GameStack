@@ -2,6 +2,21 @@
 
 ---
 
+## v0.1.2-beta — 2026-03-24
+
+### Bugfixes
+- **Minecraft-Installation**: `curl` durch natives Node.js `fetch` ersetzt – kein `curl` auf dem Server mehr nötig
+- **Minecraft-Start**: Java 21 (Temurin) wird jetzt automatisch im Docker-Image installiert
+- **Game-Server-Ports**: Backend nutzt jetzt `network_mode: host` – alle Server-Ports sind direkt am Host erreichbar ohne manuelle Port-Freigaben
+
+### Neu
+- **Minecraft-Versions-Dropdown**: Versionsauswahl beim Erstellen und in den Einstellungen
+  - „⭐ Neueste Version" als Standardoption (automatisch die aktuellste Paper-Version)
+  - Alle verfügbaren Paper-Versionen werden live von papermc.io geladen
+  - Nach Versionsänderung in den Einstellungen erscheint ein „Jetzt updaten"-Button
+
+---
+
 ## v0.1.1-beta — 2025-03-24
 
 ### Neu
