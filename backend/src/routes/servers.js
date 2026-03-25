@@ -6,12 +6,29 @@ const { getGameById } = require('../services/gameDefinitionService');
 const { startServer, stopServer, restartServer, sendCommand } = require('../services/serverProcessService');
 const { installServer, updateServer } = require('../services/installService');
 const path = require('path');
+const fs = require('fs');
 
 // io-Instanz wird beim Start gesetzt
 let _io = null;
 function setIo(io) { _io = io; }
 
 const SERVERS_BASE_PATH = process.env.SERVERS_PATH || path.join(__dirname, '../../data/servers');
+const RESOLVED_SERVERS_BASE_PATH = path.resolve(SERVERS_BASE_PATH);
+
+function removeServerDataDirectory(server) {
+  const resolvedDataPath = path.resolve(server.dataPath);
+  const isInsideServersPath =
+    resolvedDataPath.startsWith(`${RESOLVED_SERVERS_BASE_PATH}${path.sep}`) &&
+    resolvedDataPath !== RESOLVED_SERVERS_BASE_PATH;
+
+  if (!isInsideServersPath) {
+    throw new Error(`Unsicherer Server-Pfad: ${server.dataPath}`);
+  }
+
+  if (fs.existsSync(resolvedDataPath)) {
+    fs.rmSync(resolvedDataPath, { recursive: true, force: true });
+  }
+}
 
 // GET /api/servers – alle Server des eingeloggten Users
 router.get('/', requireAuth, async (req, res) => {
@@ -132,9 +149,11 @@ router.delete('/:id', requireAuth, async (req, res) => {
       }
     }
 
+    removeServerDataDirectory(server);
     await prisma.server.delete({ where: { id: server.id } });
     res.json({ message: 'Server gelöscht.' });
   } catch (err) {
+    console.error('[Servers] Löschen fehlgeschlagen:', err);
     res.status(500).json({ error: 'Server konnte nicht gelöscht werden.' });
   }
 });
