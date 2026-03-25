@@ -18,6 +18,16 @@ const restartAttempts = new Map();  // serverId → { count, windowStart }
 const MAX_RESTARTS = 3;
 const RESTART_WINDOW_MS = 5 * 60 * 1000; // 5 Minuten
 
+function isProcessAlive(pid) {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function buildSteamEnvironment(server, game) {
   const libraryPaths = [
     path.join(server.dataPath, 'game', 'bin', 'linuxsteamrt64'),
@@ -126,6 +136,28 @@ async function startServer(serverId, io) {
   const server = await prisma.server.findUnique({ where: { id: serverId } });
   if (!server) throw new Error('Server nicht gefunden.');
   if (server.status === 'running') throw new Error('Server läuft bereits.');
+  if (isProcessAlive(server.pid)) {
+    try {
+      process.kill(server.pid, 'SIGTERM');
+      emitLog(io, serverId, `[GameStack] Verwaisten Prozess ${server.pid} vor dem Start beendet...\n`);
+    } catch (err) {
+      throw new Error(`Alter Prozess ${server.pid} blockiert den Start: ${err.message}`);
+    }
+
+    const killDeadline = Date.now() + 5000;
+    while (isProcessAlive(server.pid) && Date.now() < killDeadline) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+
+    if (isProcessAlive(server.pid)) {
+      try {
+        process.kill(server.pid, 'SIGKILL');
+        emitLog(io, serverId, `[GameStack] Verwaister Prozess ${server.pid} wurde hart beendet.\n`);
+      } catch (err) {
+        throw new Error(`Alter Prozess ${server.pid} konnte nicht beendet werden: ${err.message}`);
+      }
+    }
+  }
 
   const game = getGameById(server.gameType);
   if (!game) throw new Error('Game-Definition nicht gefunden.');
@@ -257,7 +289,30 @@ async function stopServer(serverId, io) {
       }
     }, 10000);
   } else {
-    // Prozess nicht im Speicher (z.B. nach Neustart des Backends)
+    // Prozess nicht im Speicher (z.B. nach Neustart des Backends) → über gespeicherte PID stoppen
+    if (isProcessAlive(server.pid)) {
+      try {
+        process.kill(server.pid, 'SIGTERM');
+        emitLog(io, serverId, `[GameStack] Prozess ${server.pid} wird per gespeicherter PID gestoppt...\n`);
+      } catch (err) {
+        emitLog(io, serverId, `[GameStack] Konnte Prozess ${server.pid} nicht mit SIGTERM stoppen: ${err.message}\n`);
+      }
+
+      const killDeadline = Date.now() + 10000;
+      while (isProcessAlive(server.pid) && Date.now() < killDeadline) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+
+      if (isProcessAlive(server.pid)) {
+        try {
+          process.kill(server.pid, 'SIGKILL');
+          emitLog(io, serverId, `[GameStack] Prozess ${server.pid} wurde mit SIGKILL beendet.\n`);
+        } catch (err) {
+          emitLog(io, serverId, `[GameStack] Konnte Prozess ${server.pid} nicht mit SIGKILL stoppen: ${err.message}\n`);
+        }
+      }
+    }
+
     await prisma.server.update({
       where: { id: serverId },
       data: { status: 'stopped', pid: null },
