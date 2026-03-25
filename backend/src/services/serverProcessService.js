@@ -1,9 +1,12 @@
 const { spawn } = require('child_process');
+const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const pidusage = require('pidusage');
 const prisma = require('../lib/prisma');
 const { getGameById } = require('./gameDefinitionService');
+
+const STEAMCMD_DIR = process.env.STEAMCMD_PATH || path.join(__dirname, '../../../data/steamcmd');
 
 // Laufende Prozesse im Speicher halten
 const runningProcesses = new Map(); // serverId → ChildProcess
@@ -14,6 +17,60 @@ const manualStops = new Set();      // Server die manuell gestoppt wurden
 const restartAttempts = new Map();  // serverId → { count, windowStart }
 const MAX_RESTARTS = 3;
 const RESTART_WINDOW_MS = 5 * 60 * 1000; // 5 Minuten
+
+function buildSteamEnvironment(server, game) {
+  const libraryPaths = [
+    path.join(server.dataPath, 'game', 'bin', 'linuxsteamrt64'),
+    path.join(server.dataPath, 'game', 'csgo', 'bin', 'linuxsteamrt64'),
+    path.join(server.dataPath, 'game', 'csgo', 'bin'),
+  ].filter((libraryPath) => fs.existsSync(libraryPath));
+
+  const env = { ...process.env };
+  if (process.env.LD_LIBRARY_PATH) {
+    libraryPaths.push(process.env.LD_LIBRARY_PATH);
+  }
+  if (libraryPaths.length > 0) {
+    env.LD_LIBRARY_PATH = libraryPaths.join(path.delimiter);
+  }
+
+  if (game.id === 'cs2') {
+    env.SteamAppId = '730';
+    env.SteamGameId = '730';
+    env.HOME = env.HOME || os.homedir();
+  }
+
+  return env;
+}
+
+function ensureSteamSdkLinks(io, serverId) {
+  const steamHome = process.env.HOME || os.homedir();
+  if (!steamHome) return;
+
+  const linkDefinitions = [
+    {
+      target: path.join(STEAMCMD_DIR, 'linux64', 'steamclient.so'),
+      link: path.join(steamHome, '.steam', 'sdk64', 'steamclient.so'),
+    },
+    {
+      target: path.join(STEAMCMD_DIR, 'linux32', 'steamclient.so'),
+      link: path.join(steamHome, '.steam', 'sdk32', 'steamclient.so'),
+    },
+  ];
+
+  for (const { target, link } of linkDefinitions) {
+    if (!fs.existsSync(target) || fs.existsSync(link)) {
+      continue;
+    }
+
+    try {
+      fs.mkdirSync(path.dirname(link), { recursive: true });
+      fs.symlinkSync(target, link);
+      emitLog(io, serverId, `[GameStack] Steam Runtime vorbereitet: ${link} -> ${target}\n`);
+    } catch (error) {
+      emitLog(io, serverId, `[GameStack] Hinweis: Steam-Link konnte nicht erstellt werden (${error.message})\n`);
+    }
+  }
+}
 
 // Startbefehl je nach Spieltyp zusammenbauen
 function buildStartCommand(server, game) {
@@ -30,6 +87,10 @@ function buildStartCommand(server, game) {
   }
 
   if (game.type === 'steamcmd') {
+    const steamEnv = buildSteamEnvironment(server, game);
+    const cs2ScriptPath = path.join(dataPath, 'game', 'cs2.sh');
+    const hasCs2Script = fs.existsSync(cs2ScriptPath);
+
     // CS2 Spielmodus → game_type + game_mode Parameter
     const CS2_MODES = {
       competitive: { type: 0, mode: 1 },
@@ -43,18 +104,18 @@ function buildStartCommand(server, game) {
 
     // Startskript je nach Spiel
     const scripts = {
-      valheim: { cmd: './valheim_server.x86_64', args: ['-name', config.worldName || 'MyWorld', '-port', String(server.port), '-world', config.worldName || 'MyWorld', '-password', config.serverPassword || ''] },
-      cs2: { cmd: './game/bin/linuxsteamrt64/cs2', args: [
+      valheim: { cmd: './valheim_server.x86_64', args: ['-name', config.worldName || 'MyWorld', '-port', String(server.port), '-world', config.worldName || 'MyWorld', '-password', config.serverPassword || ''], env: steamEnv },
+      cs2: { cmd: hasCs2Script ? './cs2.sh' : './game/bin/linuxsteamrt64/cs2', args: [
         '-dedicated',
         '-port', String(server.port),
         '+game_type', String(cs2Mode.type),
         '+game_mode', String(cs2Mode.mode),
         '+map', config.mapName || 'de_dust2',
-      ]},
-      palworld: { cmd: './PalServer.sh', args: [] },
+      ], cwd: hasCs2Script ? path.join(dataPath, 'game') : dataPath, env: steamEnv },
+      palworld: { cmd: './PalServer.sh', args: [], env: steamEnv },
     };
     const script = scripts[game.id] || { cmd: './start.sh', args: [] };
-    return { cmd: script.cmd, args: script.args, cwd: dataPath };
+    return { cmd: script.cmd, args: script.args, cwd: script.cwd || dataPath, env: script.env || steamEnv };
   }
 
   return null;
@@ -74,6 +135,9 @@ async function startServer(serverId, io) {
 
   const command = buildStartCommand(server, game);
   if (!command) throw new Error('Kein Startbefehl für dieses Spiel definiert.');
+  if (game.type === 'steamcmd') {
+    ensureSteamSdkLinks(io, serverId);
+  }
 
   // Status auf "starting" setzen
   await prisma.server.update({ where: { id: serverId }, data: { status: 'starting' } });
@@ -83,6 +147,7 @@ async function startServer(serverId, io) {
     cwd: command.cwd,
     stdio: ['pipe', 'pipe', 'pipe'],
     detached: false,
+    env: command.env || process.env,
   });
 
   runningProcesses.set(serverId, proc);
